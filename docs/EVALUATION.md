@@ -61,10 +61,10 @@ metric that can actually be failed.
 
 | oracle-segmented sets | held-out | seen |
 |---|---|---|
-| tempo, median absolute error | **48 ms** | 52 ms |
-| tempo, mean absolute error | 165 ms | 82 ms |
-| tempo within 10% of truth | 78% | 98% |
-| rep count MAE | 0.72 | 0.22 |
+| tempo, median absolute error | **46 ms** | 52 ms |
+| tempo, mean absolute error | 137 ms | 82 ms |
+| tempo within 10% of truth | 80% | 98% |
+| rep count MAE | 0.55 | 0.22 |
 | *baseline: predict the global median tempo* | 545 ms | 489 ms |
 
 ### Why rep-count MAE is reported but not headlined
@@ -84,7 +84,7 @@ scaled proportionally — approximate, but it *varies*) separates them:
 
 | held-out participants, 556 sub-segments | rep MAE | correlation with truth |
 |---|---|---|
-| detector | **0.79** | **0.80** |
+| detector | **0.78** | **0.80** |
 | always predict 10 | 3.43 | 0.00 |
 
 ## End-to-end, no oracle segmentation
@@ -94,10 +94,10 @@ temporal IoU ≥ 0.5.
 
 | | held-out | seen |
 |---|---|---|
-| set detection recall | 77.0% (107/139) | 95.6% (86/90) |
-| spurious sets | 15 | 1 |
-| exercise correct, given a match | 96.3% | 100% |
-| rep MAE on matched sets | 1.76 | 0.86 |
+| set detection recall | 75.5% (105/139) | 95.6% (86/90) |
+| spurious sets | 1 | 0 |
+| exercise correct, given a match | 96.2% | 100% |
+| rep MAE on matched sets | 1.77 | 0.86 |
 
 Rep error is higher here than on oracle segments because detected boundaries are
 tighter than true ones — the detector finds the middle of a set and misses
@@ -111,15 +111,29 @@ uncertain one, or adding a missed set by hand.
 
 | threshold | coverage | visible errors | error rate of auto entries | burden/set |
 |---|---|---|---|---|
-| 0.00 | 74.1% | 19 | 15.6% | 0.37 |
-| 0.61 | 74.1% | 17 | 14.2% | 0.36 |
-| **0.76** | **70.5%** | **5** | **4.9%** | **0.32** |
-| 0.78 | 66.9% | 3 | 3.1% | 0.34 |
-| 0.90 | 11.5% | 0 | 0.0% | 0.88 |
+| 0.00 | 72.7% | 5 | 4.7% | 0.28 |
+| 0.61 | 71.9% | 4 | 3.8% | 0.29 |
+| **0.76** | **69.8%** | **2** | **2.0%** | **0.30** |
+| 0.78 | 68.3% | 2 | 2.1% | 0.32 |
+| 0.90 | 20.1% | 1 | 3.4% | 0.80 |
 
-The knee is sharp: going from 0.61 to 0.76 removes 70% of visible errors for 3.6
-points of coverage. Past 0.78 the system stops being useful — it is correct
-because it says nothing.
+Past 0.78 the system stops being useful — it is correct because it says nothing.
+
+The floor is much lower than it was before the plausibility gate below: even at
+threshold 0, the error rate is now 4.7% rather than 15.6%, because most of what
+the gate removed was spurious rather than merely uncertain.
+
+### Plausibility gate on detected sets
+
+Thresholds chosen on the **validation split only**, where real detections had a
+5th percentile of 10.4 s duration and 7.4 reps:
+
+| rule | keeps real | keeps spurious |
+|---|---|---|
+| duration ≥ 8 s **and** reps ≥ 5 | 100% | 20% |
+
+On held-out participants this cut spurious sets from **15 to 1** and cost 1.5
+points of recall (77.0% → 75.5%).
 
 ## Personalisation
 
@@ -143,9 +157,9 @@ threshold between them, and suppress `non_activity` probability above it.
 
 | λ (suppression) | 0.0 | 0.50 | 0.80 | 0.95 |
 |---|---|---|---|---|
-| coverage at ≤5% error, 6 confirmations | 75.2% | 78.0% | 78.0% | **79.8%** |
+| coverage at ≤5% error, 6 confirmations | 75.2% | 78.0% | 78.0% | **83.5%** |
 
-+4.6 points of coverage at the same error ceiling, for six taps, with no gradient
++8.3 points of coverage at the same error ceiling, for six taps, with no gradient
 step and no retraining.
 
 ## Rejected changes worth recording
@@ -165,6 +179,30 @@ of genuine halving: ~2% of short segments.
 
 The real fix was upstream — don't rectify in the first place. See finding 4 in
 the README.
+
+**Per-exercise tempo priors for octave selection.** Once the classifier names the
+exercise, per-class observed-period priors from training are tight (log-sd
+0.075–0.22), so a factor-of-two error should sit 3–9 σ out. Choosing among
+{P/2, P, 2P} by likelihood tripled tempo error on held-out participants
+(165 ms → 390 ms), because those participants genuinely perform lateral raises at
+1.40 s against a training median of 2.27 s. The prior cannot separate "this
+person is faster" from "the detector doubled", so it converted real between-person
+variation into fabricated corrections. Worst affected: lateral raises
+(119 ms → 827 ms), tricep extensions (90 ms → 763 ms).
+
+**Alternation-based confidence penalty.** Downgrading confidence on segments with
+borderline peak-height alternation cost 10 points of coverage (69.8% → 59.7% at
+threshold 0.76) to remove a single visible error. Segment confidence already
+takes the minimum of the classification and rep stages, so the penalty mostly
+suppressed sets whose rep signal was fine, and the borderline case it targeted
+was already being flagged by classification confidence.
+
+**What was kept.** A conservative peak-height alternation corrector at a
+threshold of 4.0. It fires on 3 of 229 test sets, all bicep curls, and corrects
+all three to within 25 ms. The honest caveat: the training split contains exactly
+**one** clearly frequency-doubled segment, so this threshold is calibrated on
+almost no data. It is set to fire rarely and be right when it does, and the
+residual doubling cases are left to the confidence gate.
 
 ## Known limitations
 

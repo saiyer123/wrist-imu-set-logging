@@ -19,7 +19,8 @@ from scipy import ndimage
 HOP_S = 1.0
 SMOOTH_WINDOWS = 5      # 5 s of context; shorter left set edges ragged
 MERGE_GAP_S = 3.0       # pauses shorter than this are within-set, not between
-MIN_SET_S = 6.0         # below this a detection is not a plausible working set
+MIN_SET_S = 8.0         # below this a detection is not a plausible working set
+MIN_REPS = 5            # a 'set' of three reps is noise; applied once reps are counted
 
 
 def smooth_proba(proba, k=SMOOTH_WINDOWS):

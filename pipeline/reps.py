@@ -131,6 +131,40 @@ def _pick_channel(sig, names):
     return best[0], best[1], best_p, best_s
 
 
+ALTERNATION_THRESHOLD = 4.0
+
+
+def _alternation_score(trace, peaks):
+    """
+    Evidence that the trace is frequency-doubled: do peak heights alternate?
+
+    If a reciprocating movement resolves into two similar half-cycles, the
+    detector locks onto half the true period and every OTHER peak belongs to the
+    return stroke. Those return strokes are rarely identical to the drive
+    strokes, so peak heights alternate high-low-high-low. Comparing even-indexed
+    against odd-indexed peaks, in units of within-group spread, separates the two
+    cases by more than an order of magnitude on training data (median 20.5 for
+    doubled segments against 0.57 for correctly-tracked ones).
+
+    This replaced an earlier attempt that used per-exercise tempo priors to pick
+    the octave. That failed for a reason worth remembering: held-out participants
+    genuinely perform lateral raises at 1.40 s against a training median of
+    2.27 s, and the prior "corrected" that real between-person difference into a
+    fabricated doubling, tripling tempo error. A prior cannot tell "this person
+    is faster" from "the detector doubled". The signal can.
+    """
+    if len(peaks) < 6:
+        return 0.0
+    h = np.asarray(trace)[peaks]
+    a, b = h[0::2], h[1::2]
+    n = min(len(a), len(b))
+    if n < 3:
+        return 0.0
+    a, b = a[:n], b[:n]
+    pooled = np.sqrt((a.var() + b.var()) / 2.0) + 1e-9
+    return float(abs(a.mean() - b.mean()) / pooled)
+
+
 def count_reps(sig, names):
     """
     Analyse one candidate set segment.
@@ -160,6 +194,20 @@ def count_reps(sig, names):
     agree = 1.0 - min(1.0, abs(n_peaks - n_period) / max(n_period, 1))
     count = n_peaks if n_peaks > 0 else n_period
 
+    # Frequency-doubling check before anything is derived from the peaks.
+    alt = _alternation_score(xf, peaks)
+    if alt > ALTERNATION_THRESHOLD and n_peaks >= 6:
+        h = xf[peaks]
+        keep_even = h[0::2].mean() >= h[1::2].mean()
+        peaks = peaks[0::2] if keep_even else peaks[1::2]
+        n_peaks = len(peaks)
+        period = period * 2.0
+        n_period = int(round(dur / period))
+        agree = 1.0 - min(1.0, abs(n_peaks - n_period) / max(n_period, 1))
+        count = n_peaks
+    out["alternation"] = alt
+    out["frequency_doubled"] = bool(alt > ALTERNATION_THRESHOLD and n_peaks >= 3)
+
     if n_peaks >= 3:
         iv = np.diff(peaks) / FS
         consistency = float(np.clip(1.0 - iv.std() / max(iv.mean(), 1e-6), 0.0, 1.0))
@@ -167,6 +215,12 @@ def count_reps(sig, names):
     else:
         consistency = 0.0
 
+    # An ambiguity penalty on borderline alternation was tried here and reverted:
+    # it cost 10 points of coverage (69.8% -> 59.7% at threshold 0.76) to remove a
+    # single visible error, because segment confidence already takes the MINIMUM
+    # of the classification and rep stages, so the penalty mostly suppressed sets
+    # whose rep signal was fine. The borderline doubling case it was meant to
+    # catch was already being flagged by classification confidence.
     confidence = float(np.clip(0.5 * ac_strength + 0.3 * agree + 0.2 * consistency, 0, 1))
     out.update(rep_count=int(count), consistency=consistency, confidence=confidence,
                count_from_period=int(n_period), count_from_peaks=int(n_peaks),
@@ -220,3 +274,5 @@ def apply_multiplier(result, exercise, multipliers):
     if result.get("period_s"):
         out["period_s"] = result["period_s"] / m
     return out
+
+

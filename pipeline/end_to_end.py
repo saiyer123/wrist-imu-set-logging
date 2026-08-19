@@ -22,6 +22,11 @@ def analyse_workout(w_id, bundle, multipliers, wrists="right"):
         # A set is only as trustworthy as its weakest stage.
         s["confidence"] = float(min(s["cls_confidence"], 0.35 + 0.65 * r["confidence"]))
 
+    # Plausibility gate, thresholds chosen on the VALIDATION split only: real sets
+    # there had a 5th percentile of 10.4 s and 7.4 reps, so 8 s / 5 reps sits well
+    # clear of them while removing most spurious detections.
+    segs = [s for s in segs if s["rep_count"] >= segment.MIN_REPS]
+
     true_segs = []
     for st, en, rr, act in wk["labels"]:
         if act not in data.CLASS_TO_IDX:

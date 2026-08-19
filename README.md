@@ -50,13 +50,13 @@ Evaluated on **participants never seen in training** (`w00, w05, w12, w13, w20`)
 | | held-out participants | participants seen in training |
 |---|---|---|
 | exercise classification, macro F1 | **0.825** | 0.957 |
-| set detection recall (self-segmented) | **77.0%** | 95.6% |
-| exercise correct, given a detected set | **96.3%** | 100% |
-| rep tempo, median absolute error | **48 ms** | 52 ms |
-| rep count MAE (oracle segments) | **0.72** | 0.22 |
+| set detection recall (self-segmented) | **75.5%** | 95.6% |
+| exercise correct, given a detected set | **96.2%** | 100% |
+| rep tempo, median absolute error | **46 ms** | 52 ms |
+| rep count MAE (oracle segments) | **0.55** | 0.22 |
 
-At a confidence threshold of 0.76: **70.5% of all real sets are logged with zero
-taps, at a 4.9% visible error rate**, leaving 0.32 user actions per set.
+At a confidence threshold of 0.76: **69.8% of all real sets are logged with zero
+taps, at a 2.0% visible error rate**, leaving 0.30 user actions per set.
 
 Cost: 0.78 ms per window for features, 0.11 ms for inference — roughly 1 ms of
 compute per second of workout, comfortably real-time on a phone.
@@ -79,7 +79,7 @@ where the answer actually varies. There the illusion collapses:
 
 | | rep MAE | correlation with truth |
 |---|---|---|
-| detector | **0.79** | **0.80** |
+| detector | **0.78** | **0.80** |
 | always-predict-10 | 3.43 | 0.00 |
 
 **3. One wrist physically cannot see a two-armed alternating exercise.**
@@ -97,7 +97,7 @@ Every badly-wrong segment had one thing in common: the gyroscope channel. Taking
 *and* on the way back — exactly twice per rep. The accelerometer mostly escapes
 this because gravity breaks the symmetry. Replacing magnitude with a **signed
 projection onto the first principal component** fixed it: jumping-jack rep MAE
-went from 4.14 to **0.08**, and overall count MAE from 0.96 to 0.72.
+went from 4.14 to **0.08**, and overall count MAE from 0.96 to 0.55.
 
 **5. The obvious personalisation was aimed at the wrong failure.**
 Learning per-user class centroids from a few confirmed sets *hurt* at every blend
@@ -106,7 +106,25 @@ exercise misread as rest**, not one exercise confused for another. Centroid
 blending redistributes probability among exercise classes, so it addressed the
 other 14.5%. Personalising the **activity/rest boundary** instead — one
 movement-energy threshold from the user's own confirmed sets — lifts coverage
-from 75.2% to **79.8%** at the same error ceiling, from six confirmations.
+from 75.2% to **83.5%** at the same error ceiling, from six confirmations.
+
+**6. Rare failures cannot be engineered away — only flagged.**
+Residual frequency doubling survives on a few segments. The obvious fixes both
+failed on measurement: per-exercise tempo priors "corrected" genuine
+between-person differences into fabricated errors (held-out participants really
+do lateral raises at 1.40 s against a training median of 2.27 s), and an
+alternation-based confidence penalty cost 10 points of coverage to remove one
+error. The deciding constraint is that **the training split contains exactly one
+clearly-doubled segment** — there is no distribution to calibrate a corrector
+against. What ships is a conservative corrector that fires on 3 of 229 test sets
+and is right all 3 times, with the residual cases falling below the confidence
+threshold and going to the user. A system that knows it is unsure beats one that
+guesses.
+
+A plausibility gate on detected sets (≥ 8 s and ≥ 5 reps, thresholds taken from
+the validation split where real sets had 5th percentiles of 10.4 s and 7.4 reps)
+cut spurious detections on held-out participants from **15 to 1**, costing 1.5
+points of recall.
 
 ## Deliberate tradeoffs
 
