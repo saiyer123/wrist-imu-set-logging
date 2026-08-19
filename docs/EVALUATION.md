@@ -95,13 +95,17 @@ temporal IoU ≥ 0.5.
 | | held-out | seen |
 |---|---|---|
 | set detection recall | 75.5% (105/139) | 95.6% (86/90) |
-| spurious sets | 1 | 0 |
+| spurious sets | 4 | 0 |
 | exercise correct, given a match | 96.2% | 100% |
-| rep MAE on matched sets | 1.77 | 0.86 |
+| rep MAE on matched sets | 0.89 | 0.36 |
 
-Rep error is higher here than on oracle segments because detected boundaries are
-tighter than true ones — the detector finds the middle of a set and misses
-ramp-in and ramp-out reps. This is the honest number for a deployed system.
+Detected boundaries are systematically tighter than real sets, because
+probability smoothing erodes the edges, so the first and last repetition often
+fall outside the detected span. Growing each span by 1 s before counting — a
+value chosen on the validation split, where it took rep MAE from 1.09 to 0.70,
+while 2 s and beyond pulled in rest and made it worse — roughly halved rep error
+end to end (1.77 → 0.89 on held-out participants). It costs 3 extra spurious
+sets, because padding lifts some noise segments over the ≥5 rep gate.
 
 ## Confidence gating
 
@@ -109,13 +113,19 @@ Held-out participants, 139 real sets. "Correction burden" counts every action a
 user must take to reach a correct log: deleting a wrong auto-entry, confirming an
 uncertain one, or adding a missed set by hand.
 
+A **visible error** is any auto-logged entry a user would notice is wrong: a set
+that never happened, the wrong exercise, or a rep count off by more than two.
+Counting only misclassification would flatter the system, because the log records
+repetitions too — "5 reps" for a set of ten costs exactly the trust this design
+protects. The demo UI uses the same definition, so the two never disagree.
+
 | threshold | coverage | visible errors | error rate of auto entries | burden/set |
 |---|---|---|---|---|
-| 0.00 | 72.7% | 5 | 4.7% | 0.28 |
-| 0.61 | 71.9% | 4 | 3.8% | 0.29 |
-| **0.76** | **69.8%** | **2** | **2.0%** | **0.30** |
-| 0.78 | 68.3% | 2 | 2.1% | 0.32 |
-| 0.90 | 20.1% | 1 | 3.4% | 0.80 |
+| 0.00 | 69.1% | 13 | 11.9% | 0.34 |
+| 0.61 | 69.1% | 12 | 11.1% | 0.34 |
+| 0.76 | 66.9% | 7 | 7.0% | 0.34 |
+| **0.78** | **66.9%** | **4** | **4.1%** | **0.33** |
+| 0.90 | 18.7% | 1 | 3.7% | 0.81 |
 
 Past 0.78 the system stops being useful — it is correct because it says nothing.
 

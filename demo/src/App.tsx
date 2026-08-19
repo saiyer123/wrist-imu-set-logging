@@ -6,12 +6,15 @@ import { colourFor, pretty } from './labels'
 
 const SPEEDS = [30, 90, 240]
 
+/** Rep miscount a user would plausibly shrug off. Beyond this it is a visible error. */
+const REP_TOLERANCE = 2
+
 export default function App() {
   const [wk, setWk] = useState<Workout | null>(null)
   const [playhead, setPlayhead] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(90)
-  const [threshold, setThreshold] = useState(0.76)
+  const [threshold, setThreshold] = useState(0.78)
   const [selected, setSelected] = useState<number | null>(null)
   const [showMissed, setShowMissed] = useState(false)
   const [actions, setActions] = useState<Record<number, UserAction>>({})
@@ -47,7 +50,17 @@ export default function App() {
     if (!wk) return null
     const auto = wk.segments.filter((s) => s.confidence >= threshold)
     const review = wk.segments.filter((s) => s.confidence < threshold)
-    const autoWrong = auto.filter((s) => !s.truth || s.truth.exercise !== s.exercise)
+    // A visible error is anything an auto-logged entry gets wrong that the user
+    // would notice: a set that never happened, the wrong exercise, OR a rep
+    // count far enough off to be obviously untrue. Counting only exercise
+    // mistakes would flatter the system - the log records reps too, and "5" for
+    // a set of 10 costs exactly the trust this whole design is protecting.
+    const autoWrong = auto.filter(
+      (s) =>
+        !s.truth ||
+        s.truth.exercise !== s.exercise ||
+        Math.abs(s.reps - s.truth.reps) > REP_TOLERANCE,
+    )
     const autoRight = auto.length - autoWrong.length
     // Every set the user must touch: a wrong auto-entry, a prompt, or a set we never found.
     const burden = autoWrong.length + review.length + wk.missed_truth.length
@@ -130,7 +143,7 @@ export default function App() {
           <Stat label="Auto-logged" value={`${stats.autoLogged}`} sub={`of ${wk.n_true_sets} real sets`} />
           <Stat label="Coverage" value={`${Math.round(stats.coverage * 100)}%`} sub="logged with zero taps" />
           <Stat label="Visible errors" value={`${stats.visibleErrors}`}
-                sub={`${Math.round(stats.errorRate * 100)}% of auto entries`}
+                sub={`wrong exercise or reps off by >${REP_TOLERANCE}`}
                 tone={stats.visibleErrors ? 'bad' : 'good'} />
           <Stat label="Needs a tap" value={`${stats.review + stats.missed}`}
                 sub={`${stats.review} unsure · ${stats.missed} missed`} />

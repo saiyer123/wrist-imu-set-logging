@@ -54,9 +54,14 @@ Evaluated on **participants never seen in training** (`w00, w05, w12, w13, w20`)
 | exercise correct, given a detected set | **96.2%** | 100% |
 | rep tempo, median absolute error | **46 ms** | 52 ms |
 | rep count MAE (oracle segments) | **0.55** | 0.22 |
+| rep count MAE (self-detected sets) | **0.89** | 0.36 |
 
-At a confidence threshold of 0.76: **69.8% of all real sets are logged with zero
-taps, at a 2.0% visible error rate**, leaving 0.30 user actions per set.
+At a confidence threshold of 0.78: **66.9% of all real sets are logged with zero
+taps, at a 4.1% visible error rate**, leaving 0.33 user actions per set. A
+"visible error" counts anything an auto-logged entry gets wrong that a user would
+notice — a set that never happened, the wrong exercise, or a rep count off by
+more than two. Counting only misclassification would flatter the system, since
+the log records reps too.
 
 Cost: 0.78 ms per window for features, 0.11 ms for inference — roughly 1 ms of
 compute per second of workout, comfortably real-time on a phone.

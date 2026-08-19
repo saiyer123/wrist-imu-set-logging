@@ -4,6 +4,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
 import data, features, reps, segment
 
+REP_PAD_S = 1.0  # see analyse_workout(); chosen on the validation split
+
 
 def analyse_workout(w_id, bundle, multipliers, wrists="right"):
     wk = data.load_workout(w_id, wrists=wrists)
@@ -13,8 +15,18 @@ def analyse_workout(w_id, bundle, multipliers, wrists="right"):
     segs = segment.segments_from_proba(proba, centres, classes,
                                        classes.index(data.NON_ACTIVITY))
 
+    # Grow each detected span by REP_PAD_S before counting. Classification
+    # boundaries are systematically tighter than real sets - probability
+    # smoothing erodes the edges, so the first and last repetition of a set
+    # often fall outside the detected span and go uncounted. Padding is chosen
+    # on the VALIDATION split: 1 s takes rep MAE from 1.09 to 0.70 there, while
+    # 2 s and beyond starts pulling in rest and makes it worse.
+    pad = int(REP_PAD_S * data.TARGET_HZ)
+    n_samples = len(wk["t"])
     for s in segs:
-        r = reps.count_reps(wk["sig"][s["start_idx"]:s["end_idx"]], wk["names"])
+        a = max(0, s["start_idx"] - pad)
+        b = min(n_samples, s["end_idx"] + pad)
+        r = reps.count_reps(wk["sig"][a:b], wk["names"])
         r = reps.apply_multiplier(r, s["exercise"], multipliers)
         s.update(rep_count=r["rep_count"], period_s=r["period_s"],
                  consistency=r["consistency"], rep_confidence=r["confidence"],

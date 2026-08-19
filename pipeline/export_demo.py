@@ -22,7 +22,10 @@ def export(w_id="00", out="demo/public/workout.json"):
     out_segs = []
     for i, s in enumerate(segs):
         j = truth_of.get(i)
-        r = reps.count_reps(wk["sig"][s["start_idx"]:s["end_idx"]], wk["names"])
+        pad = int(end_to_end.REP_PAD_S * data.TARGET_HZ)
+        a = max(0, s["start_idx"] - pad)
+        b = min(len(wk["t"]), s["end_idx"] + pad)
+        r = reps.count_reps(wk["sig"][a:b], wk["names"])
         tr = r["trace"]
         ds = max(1, len(tr) // 600)
         out_segs.append({

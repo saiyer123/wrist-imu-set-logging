@@ -47,6 +47,7 @@ export function SetDetail({
 
   const auto = seg.confidence >= threshold
   const correct = seg.truth ? seg.truth.exercise === seg.exercise : null
+  const repDelta = seg.truth ? Math.abs(seg.reps - seg.truth.reps) : 0
 
   return (
     <div className="detail">
@@ -78,9 +79,16 @@ export function SetDetail({
         {seg.truth ? (
           <>
             <span className={correct ? 'ok-text' : 'bad-text'}>
-              {correct ? '✓ matches ground truth' : '✗ ground truth says ' + pretty(seg.truth.exercise)}
+              {correct
+                ? `✓ exercise correct`
+                : `✗ exercise wrong — labelled ${pretty(seg.truth.exercise)}`}
             </span>
-            <span className="muted"> · labelled {seg.truth.reps} reps</span>
+            <span className={repDelta > 2 ? 'bad-text' : 'muted'}>
+              {' · '}
+              {repDelta === 0
+                ? `reps exact (${seg.truth.reps})`
+                : `reps ${seg.reps} vs ${seg.truth.reps} labelled`}
+            </span>
           </>
         ) : (
           <span className="bad-text">✗ no ground-truth set overlaps this detection (false positive)</span>

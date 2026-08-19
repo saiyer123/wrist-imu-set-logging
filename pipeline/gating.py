@@ -29,6 +29,24 @@ import features
 import segment
 
 
+REP_TOLERANCE = 2   # a miscount a user would shrug off; beyond this it is visible
+
+
+def _entry_wrong(r):
+    """An auto-logged entry the user would notice is wrong.
+
+    The log records repetitions as well as exercise, so counting only
+    misclassification flatters the system: "5 reps" for a set of 10 costs
+    exactly the trust this design exists to protect. The demo UI uses the same
+    definition, so the two never disagree.
+    """
+    if r["pred_ex"] != r["true_ex"]:
+        return True
+    if r.get("pred_reps") is not None and r.get("true_reps") is not None:
+        return abs(r["pred_reps"] - r["true_reps"]) > REP_TOLERANCE
+    return False
+
+
 def sweep(rows, thresholds=np.linspace(0.0, 0.95, 40)):
     matched = [r for r in rows if r.get("matched")]
     spurious = [r for r in rows if r.get("spurious")]
@@ -36,8 +54,8 @@ def sweep(rows, thresholds=np.linspace(0.0, 0.95, 40)):
 
     out = []
     for t in thresholds:
-        auto_ok = [r for r in matched if r["conf"] >= t and r["pred_ex"] == r["true_ex"]]
-        auto_bad = [r for r in matched if r["conf"] >= t and r["pred_ex"] != r["true_ex"]]
+        auto_ok = [r for r in matched if r["conf"] >= t and not _entry_wrong(r)]
+        auto_bad = [r for r in matched if r["conf"] >= t and _entry_wrong(r)]
         auto_spur = [r for r in spurious if r["conf"] >= t]
 
         # Anything not auto-logged has to be entered or confirmed by hand.
