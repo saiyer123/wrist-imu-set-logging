@@ -136,14 +136,16 @@ points of recall.
 - **Right wrist only.** MM-Fit participants wore watches on both wrists. Using
   both raises accuracy but describes a setup nobody has. Single-wrist is the
   default; `wrists="both"` exists for measuring the gap.
-- **Interpretable baseline before a neural net.** A 1D CNN was scoped and not
-  built: the feature model already reaches 0.96 precision on held-out
-  participants, and the binding constraint is the activity/rest boundary and
-  single-wrist observability, neither of which more capacity fixes. Spending the
-  time on evaluation design was worth more than spending it on architecture.
-- **Confidence is the weakest link, not an average.** A set's confidence is the
-  minimum of its classification and rep-detection confidence, so a clean
-  classification cannot paper over an unreadable rep signal.
+- **An interpretable baseline before a neural network.** A 1D CNN was planned and
+  deliberately not built. The feature model already reaches 0.94 precision on
+  held-out participants, and what limits the system is not capacity: a wrist
+  cannot tell whether a stranger is exercising at all, and cannot see
+  repetitions performed by the other arm. A bigger model fixes neither, so the
+  time went into evaluation design — which is where the real errors were hiding.
+- **Confidence is a weakest link, not an average.** A set's confidence is the
+  lower of its classification and rep-detection confidence, not a blend of them.
+  A clean exercise match should not be allowed to cover for a rep signal the
+  system cannot read: if either stage is unsure, the whole entry is.
 - **No LLM in the sensing path.** Deterministic metrics first; any natural
   language summary would sit strictly downstream of verified measurements.
 
